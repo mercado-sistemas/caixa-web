@@ -31,13 +31,13 @@ input,select,textarea{font-family:inherit; font-size:14px}
 .m-btn--perigo{color:var(--vermelho)}
 .m-btn:disabled{opacity:.5; cursor:not-allowed}
 
-.m-campo{display:grid; grid-template-columns:140px 1fr; gap:6px 10px; align-items:center; margin-bottom:9px}
+.m-campo{display:grid; grid-template-columns:1fr; gap:4px; margin-bottom:12px}
 .m-campo label{font-size:12px; font-weight:800; color:var(--azul); text-transform:uppercase; letter-spacing:.03em}
 .m-campo input, .m-campo select{
-  padding:9px 11px; border:1.5px solid var(--linha); border-radius:7px; background:#FAFBFC; width:100%;
+  padding:12px 14px; border:1.5px solid var(--linha); border-radius:7px; background:#FAFBFC;
+  width:100%; font-size:15px; min-height:44px;
 }
 .m-campo input:focus, .m-campo select:focus{outline:2px solid var(--amarelo); border-color:var(--amarelo-2)}
-@media(max-width:560px){ .m-campo{grid-template-columns:1fr; gap:3px} }
 
 .m-janela{
   background:#fff; border:1px solid var(--azul-2); border-radius:8px; overflow:hidden;
