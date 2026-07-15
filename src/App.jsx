@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { TituloSistema, Janela, Campo, Botao, Tabela, useToast, brl } from '@mercado/shared';
+import { TituloSistema, Janela, Campo, Botao, Tabela, useToast, brl } from './shared';
 import { api, auth } from './api.js';
 import Login from './Login.jsx';
 

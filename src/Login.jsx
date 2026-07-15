@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Janela, Campo, Botao, useToast } from '@mercado/shared';
+import { Janela, Campo, Botao, useToast } from './shared';
 import { api, auth } from './api.js';
 
 const FILIAIS = [
