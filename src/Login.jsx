@@ -30,8 +30,14 @@ export default function Login({ titulo, aoEntrar }) {
       if (!r.ok) throw new Error(dados.erro || dados.message || `Erro ${r.status}`);
 
       auth.set(dados.token);
-      const lojas = dados.lojas || await buscarLojas(dados.token);
-      if (!lojas || lojas.length === 0) throw new Error('Nenhuma filial encontrada.');
+      const lojas = (dados.lojas && dados.lojas.length > 0)
+        ? dados.lojas
+        : await buscarLojas(dados.token);
+
+      if (!lojas || lojas.length === 0) {
+        aoEntrar({ ...dados, filial: null, filialNome: null });
+        return;
+      }
 
       if (lojas.length === 1) {
         aoEntrar({ ...dados, filial: lojas[0].id, filialNome: lojas[0].nome });
