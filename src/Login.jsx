@@ -23,7 +23,7 @@ export default function Login({ titulo, aoEntrar }) {
       const r = await fetch(`${BFF}/api/auth/login`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ usuario, senha }),
+        body: JSON.stringify({ login: usuario, senha }),
       });
       const texto = await r.text();
       const dados = texto ? JSON.parse(texto) : {};
