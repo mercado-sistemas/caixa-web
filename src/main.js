@@ -72,14 +72,12 @@ function fecharJanela() {
 async function entrar() {
   const loginVal = $('#lg-usr').value.trim();
   const senhaVal = $('#lg-sen').value.trim();
-  filialAtual    = $('#lg-emp').value;
   if (!loginVal) return toast('Informe o usuário.');
   if (!senhaVal) return toast('Informe a senha.');
 
   const btn = $('#btn-entrar');
   btn.disabled = true; btn.textContent = 'Verificando…';
   try {
-    // Auth fica no estocaai-bff, não no caixa-bff
     const r = await fetch(`${EBFF}/api/auth/login`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ login: loginVal, senha: senhaVal }),
@@ -90,33 +88,56 @@ async function entrar() {
     auth.set(dados.token);
     sessao = dados;
 
-    // Carrega filiais reais do banco (via estocaai-bff ou caixa-bff)
-    try {
-      const lojas = await estoqueApi('/lojas');
-      if (lojas && lojas.length > 0) {
-        FILIAIS = lojas;
-        // Atualiza dropdown do login
-        const sel = $('#lg-emp');
-        if (sel) sel.innerHTML = FILIAIS.map(f => `<option value="${f.id}">${f.nome}</option>`).join('');
+    if (dados.role === 'ADMIN') {
+      try {
+        const lojas = await estoqueApi('/lojas');
+        if (lojas?.length > 0) FILIAIS = lojas;
+      } catch (_) {
+        if (dados.lojas?.length > 0) FILIAIS = dados.lojas;
       }
-    } catch (_) {
-      if (dados.lojas && dados.lojas.length > 0) FILIAIS = dados.lojas;
+    } else {
+      FILIAIS = dados.lojas || [];
     }
 
-    filialAtual = $('#lg-emp').value || (FILIAIS[0]?.id ?? filialAtual);
-
     $('#veu-login').classList.add('hide');
-    $('#st-usuario').textContent = dados.nome || loginVal.toUpperCase();
-    $('#st-filial').textContent = nomeFil(filialAtual);
-    $('#info-filial').textContent = nomeFil(filialAtual);
-    $('#info-vendedor').textContent = dados.nome || loginVal;
 
-    toast(`Bem-vindo(a), <b>${dados.nome || loginVal}</b>!`);
-    await criarNovaPreVenda();
+    if (FILIAIS.length === 1) {
+      filialAtual = FILIAIS[0].id;
+      await entrarNoCaixa(dados, loginVal);
+    } else if (FILIAIS.length > 1) {
+      const lista = $('#lista-filiais-picker');
+      lista.innerHTML = FILIAIS.map((f, i) =>
+        `<button class="btn-acao" style="text-align:left; padding:12px 16px; font-size:14px"
+           onclick="selecionarFilialLogin('${f.id}')">
+           <b>${i + 1}</b> — ${f.nome}
+         </button>`
+      ).join('');
+      $('#veu-filial').classList.remove('hide');
+      window._dadosLogin = dados;
+      window._loginVal = loginVal;
+    } else {
+      filialAtual = null;
+      await entrarNoCaixa(dados, loginVal);
+    }
   } catch (e) {
     toast(e.message);
     btn.disabled = false; btn.textContent = 'Ok';
   }
+}
+
+async function selecionarFilialLogin(id) {
+  filialAtual = id;
+  $('#veu-filial').classList.add('hide');
+  await entrarNoCaixa(window._dadosLogin, window._loginVal);
+}
+
+async function entrarNoCaixa(dados, loginVal) {
+  $('#st-usuario').textContent = dados.nome || loginVal.toUpperCase();
+  $('#st-filial').textContent = nomeFil(filialAtual);
+  $('#info-filial').textContent = nomeFil(filialAtual);
+  $('#info-vendedor').textContent = dados.nome || loginVal;
+  toast(`Bem-vindo(a), <b>${dados.nome || loginVal}</b>!`);
+  await criarNovaPreVenda();
 }
 
 // ─── Pré-Venda ────────────────────────────────────────────────────────────────
@@ -676,24 +697,10 @@ $('#lg-sen').addEventListener('keydown', e => { if (e.key === 'Enter') entrar();
 $('#lg-usr').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 montarMenus(); montarToolbar();
 
-// Carrega filiais antes do login (endpoint público)
-(async () => {
-  try {
-    const lojas = await fetch(`${EBFF}/api/lojas`).then(r => r.ok ? r.json() : []);
-    if (lojas && lojas.length > 0) {
-      FILIAIS = lojas;
-      const sel = $('#lg-emp');
-      if (sel) sel.innerHTML = FILIAIS.map(f => `<option value="${f.id}">${f.nome}</option>`).join('');
-    }
-  } catch (_) {
-    const sel = $('#lg-emp');
-    if (sel) sel.innerHTML = '<option value="">Selecionar após login</option>';
-  }
-})();
 
 // ─── Global ───────────────────────────────────────────────────────────────────
 Object.assign(window, {
-  entrar, fecharJanela, fecharMenus,
+  entrar, selecionarFilialLogin, fecharJanela, fecharMenus,
   abrirBuscarProduto, buscarProduto, selecionarProdutoBusca, adicionarItem,
   janelaEmitir, adicionarPagamento, removePagamento, confirmarEmissao,
   janelaCancelar, confirmarCancelamento,

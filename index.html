@@ -240,17 +240,23 @@ kbd{font-family:inherit; font-weight:800; font-size:11px; color:var(--cinza)}
     <div class="corpo-login">
       <div class="logo-login">C<span>x</span></div>
       <div class="campos-login">
-        <div class="form-linha"><label for="lg-emp">Filial</label>
-          <select id="lg-emp">
-            <option value="">Carregando…</option>
-          </select>
-        </div>
         <div class="form-linha"><label for="lg-usr">Usuário</label><input id="lg-usr" autocomplete="username" placeholder="e-mail ou username"></div>
         <div class="form-linha"><label for="lg-sen">Senha</label><input id="lg-sen" type="password" autocomplete="current-password" placeholder="••••••"></div>
       </div>
     </div>
     <div class="rodape-login">
       <button class="btn-acao primario" id="btn-entrar" style="min-width:110px" onclick="entrar()"><u>O</u>k</button>
+    </div>
+  </div>
+</div>
+
+<!-- Filial picker -->
+<div class="veu-login hide" id="veu-filial">
+  <div class="janela-login">
+    <div class="janela-cab"><div class="dobra"></div><div class="tit">SELECIONAR FILIAL</div></div>
+    <div class="corpo-login" style="flex-direction:column; padding:22px; gap:12px;">
+      <p style="font-size:13.5px; color:var(--cinza);">Escolha a filial do caixa:</p>
+      <div id="lista-filiais-picker" style="display:flex; flex-direction:column; gap:8px;"></div>
     </div>
   </div>
 </div>
