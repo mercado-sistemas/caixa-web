@@ -24,16 +24,18 @@ const caixaApi   = (p, o) => apiFetch(BFF, p, o);
 const estoqueApi = (p, o) => apiFetch(EBFF, p, o);
 
 // ─── Estado ───────────────────────────────────────────────────────────────────
-let sessao     = null;
+let sessao      = null;
 let filialAtual = null;
-let preVenda   = null;   // PreVendaResponse atual
-let PRODUTOS   = [];     // cache dos produtos buscados
-let pagamentos = [];     // lista de pagamentos acumulados antes de emitir
+let FILIAIS     = [];    // filiais reais do banco
+let preVenda    = null;  // PreVendaResponse atual
+let clienteAtual = null; // cliente identificado na pré-venda
+let PRODUTOS    = [];    // cache dos produtos buscados
+let pagamentos  = [];    // lista de pagamentos acumulados antes de emitir
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const $ = s => document.querySelector(s);
 const brl = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const nomeFil = id => ({ par: 'Parnamirim', mac: 'Macaíba', nat: 'Natal' }[id] || id || '—');
+const nomeFil = id => FILIAIS.find(f => f.id === id)?.nome || id || '—';
 
 function toast(m) {
   const t = $('#toast');
@@ -86,6 +88,22 @@ async function entrar() {
 
     auth.set(dados.token);
     sessao = dados;
+
+    // Carrega filiais reais do banco (via estocaai-bff ou caixa-bff)
+    try {
+      const lojas = await estoqueApi('/lojas');
+      if (lojas && lojas.length > 0) {
+        FILIAIS = lojas;
+        // Atualiza dropdown do login
+        const sel = $('#lg-emp');
+        if (sel) sel.innerHTML = FILIAIS.map(f => `<option value="${f.id}">${f.nome}</option>`).join('');
+      }
+    } catch (_) {
+      if (dados.lojas && dados.lojas.length > 0) FILIAIS = dados.lojas;
+    }
+
+    filialAtual = $('#lg-emp').value || (FILIAIS[0]?.id ?? filialAtual);
+
     $('#veu-login').classList.add('hide');
     $('#st-usuario').textContent = dados.nome || loginVal.toUpperCase();
     $('#st-filial').textContent = nomeFil(filialAtual);
@@ -103,6 +121,7 @@ async function entrar() {
 // ─── Pré-Venda ────────────────────────────────────────────────────────────────
 async function criarNovaPreVenda() {
   try {
+    clienteAtual = null;
     preVenda = await caixaApi('/prevendas', {
       method: 'POST',
       body: { filial: filialAtual, vendedor: sessao?.nome || 'Usuário', cliente: null },
@@ -163,6 +182,63 @@ async function removerItem(idx) {
     pagamentos = [];
     atualizarUI();
   } catch (e) { toast(e.message); }
+}
+
+// ─── Identificar Cliente (0) ──────────────────────────────────────────────────
+function janelaIdentificarCliente() {
+  if (!preVenda) return toast('Sem pré-venda ativa.');
+  abrirJanela('Identificar Cliente', `
+    <div class="linha-consulta" style="margin-bottom:10px">
+      <input type="text" id="ic-busca" placeholder="Nome, CPF/CNPJ ou código do cliente…" autocomplete="off">
+      <button class="btn-acao" onclick="buscarClientesCaixa()">Buscar</button>
+    </div>
+    <div class="moldura-grid" style="max-height:300px"><table class="tabela" id="grid-ic">
+      <thead><tr><th class="num">Cód</th><th>Nome</th><th>Fantasia</th><th>CPF/CNPJ</th><th>Cidade</th></tr></thead>
+      <tbody><tr><td colspan="5" style="text-align:center;color:var(--cinza);padding:18px">Digite para buscar.</td></tr></tbody>
+    </table></div>
+    <div class="rodape-form">
+      <button class="btn-acao" onclick="fecharJanela()">Fechar</button>
+      <button class="btn-acao" onclick="limparCliente()">Remover Cliente</button>
+    </div>`, 780);
+  setTimeout(() => $('#ic-busca')?.focus(), 60);
+  $('#ic-busca').addEventListener('keydown', e => { if (e.key === 'Enter') buscarClientesCaixa(); });
+}
+
+let _icClientes = [];
+async function buscarClientesCaixa() {
+  const q = ($('#ic-busca')?.value || '').trim();
+  if (!q) return toast('Digite para buscar.');
+  const tb = document.querySelector('#grid-ic tbody');
+  if (!tb) return;
+  tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--cinza);padding:18px">Buscando…</td></tr>';
+  try {
+    _icClientes = await estoqueApi(`/clientes?busca=${encodeURIComponent(q)}`);
+    tb.innerHTML = _icClientes.map(c => `
+      <tr onclick="selecionarClienteCaixa('${c.id}')">
+        <td class="num">${c.cod || '—'}</td><td>${c.nome}</td>
+        <td>${c.fantasia || '—'}</td><td>${c.cpfCnpj || '—'}</td><td>${c.cidade || '—'}</td>
+      </tr>`).join('') ||
+      '<tr><td colspan="5" style="text-align:center;color:var(--cinza);padding:18px">Nenhum cliente.</td></tr>';
+    if (_icClientes.length === 1) selecionarClienteCaixa(_icClientes[0].id);
+  } catch (e) {
+    if (tb) tb.innerHTML = `<tr><td colspan="5" style="color:var(--vermelho);text-align:center;padding:18px">${e.message}</td></tr>`;
+  }
+}
+
+async function selecionarClienteCaixa(id) {
+  const c = _icClientes.find(x => x.id === id);
+  if (!c) return;
+  clienteAtual = c;
+  fecharJanela();
+  $('#info-cliente').textContent = c.nome + (c.cpfCnpj ? ` (${c.cpfCnpj})` : '');
+  toast(`Cliente identificado: <b>${c.nome}</b>`);
+}
+
+function limparCliente() {
+  clienteAtual = null;
+  $('#info-cliente').textContent = '—';
+  fecharJanela();
+  toast('Cliente removido da pré-venda.');
 }
 
 // ─── Buscar Produto (F7) ──────────────────────────────────────────────────────
@@ -517,8 +593,9 @@ const MENUS = [
     { rot: '2 - Nova Pré-Venda…', tecla: 'F2', ac: janelaNovaPreVenda },
     { rot: '3 - Pré-Vendas Abertas…', tecla: 'F3', ac: janelaPreVendasAbertas },
     { rot: '4 - Histórico de Vendas…', tecla: 'F4', ac: janelaVendasFinalizadas },
-    { rot: '9 - Emitir NFC-e…', tecla: 'F9', ac: janelaEmitir },
-    { rot: 'Del - Cancelar…', tecla: 'F8', ac: janelaCancelar },
+    { rot: '0 - Identificar Cliente…', ac: janelaIdentificarCliente },
+    { rot: '5 - Emitir NFC-e…', tecla: 'F9', ac: janelaEmitir },
+    { rot: 'Cancela Pré-Venda…', tecla: 'F8', ac: janelaCancelar },
   ]},
   { rot: 'Itens', itens: [
     { rot: '7 - Buscar Produto…', tecla: 'F7', ac: abrirBuscarProduto },
@@ -606,5 +683,6 @@ Object.assign(window, {
   janelaNovaPreVenda, confirmarNovaPV,
   janelaPreVendasAbertas, carregarPreVenda,
   janelaVendasFinalizadas,
+  janelaIdentificarCliente, buscarClientesCaixa, selecionarClienteCaixa, limparCliente,
   removerItem, nomeFil,
 });
