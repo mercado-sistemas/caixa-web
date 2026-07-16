@@ -1,12 +1,332 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Estocaaí Caixa — Pré-Venda</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estocaaí Caixa — Pré-Venda</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --azul:#14213D; --azul-2:#1E2F55; --azul-3:#2A3E6B;
+  --amarelo:#FFD60A; --amarelo-2:#E6BE00; --amarelo-bg:#FFF6D1;
+  --fundo:#EDEFF3; --janela:#FFFFFF; --tinta:#16181D; --cinza:#6B7280; --linha:#D8DCE3;
+  --verde:#1E7A52; --vermelho:#B3362B; --vermelho-bg:#FBEAE8; --verde-bg:#E4F3EC;
+  --sel:#DCE6FA;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%}
+body{
+  font-family:'Archivo', system-ui, sans-serif; font-size:14px; color:var(--tinta);
+  background:var(--azul);
+  background-image:
+    radial-gradient(circle at 80% 10%, rgba(255,214,10,.12), transparent 45%),
+    repeating-linear-gradient(-45deg, transparent 0 26px, rgba(255,255,255,.03) 26px 27px);
+  display:flex; flex-direction:column; min-height:100dvh; overflow:hidden;
+}
+button{font-family:inherit; cursor:pointer}
+input,select,textarea{font-family:inherit; font-size:14px}
+.hide{display:none !important}
+kbd{font-family:inherit; font-weight:800; font-size:11px; color:var(--cinza)}
+
+.titulo-sis{
+  background:var(--azul-2); color:#fff; text-align:center; font-weight:900; letter-spacing:.14em;
+  font-size:13px; padding:7px 0; text-transform:uppercase; user-select:none;
+  border-bottom:2px solid var(--amarelo);
+}
+.titulo-sis span{color:var(--amarelo)}
+
+.menubar{
+  background:#fff; border-bottom:1px solid var(--linha); display:flex; padding:0 6px;
+  position:relative; z-index:80; user-select:none; flex-wrap:wrap;
+}
+.menu-raiz{position:relative}
+.menu-raiz > button{background:none; border:none; padding:8px 12px; font-size:13.5px; font-weight:600}
+.menu-raiz > button:hover,.menu-raiz.aberto > button{background:var(--amarelo-bg)}
+.menu-raiz > button u{text-decoration:underline; text-underline-offset:2px}
+.submenu{
+  position:absolute; top:100%; left:0; min-width:260px; background:#fff;
+  border:1px solid var(--linha); box-shadow:0 10px 30px rgba(20,33,61,.25); z-index:90; padding:4px 0;
+}
+.submenu .item{
+  width:100%; text-align:left; background:none; border:none; padding:8px 14px; font-size:13.5px;
+  display:flex; align-items:center; gap:8px; position:relative; white-space:nowrap;
+}
+.submenu .item:hover{background:var(--sel)}
+.submenu .item .tecla{margin-left:auto; padding-left:24px}
+.submenu .item .seta{margin-left:auto; padding-left:24px; color:var(--cinza); font-size:11px}
+.submenu .submenu{top:-5px; left:100%}
+
+.toolbar{
+  background:#fff; border-bottom:1px solid var(--linha); display:flex;
+  overflow-x:auto; padding:6px 8px; gap:2px;
+}
+.ferramenta{
+  border:none; background:none; border-radius:8px; padding:7px 11px; min-width:82px;
+  flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+.ferramenta:hover{background:var(--amarelo-bg)}
+.ferramenta .ico{font-size:19px; line-height:1}
+.ferramenta .atalho{font-weight:900; font-size:12.5px; color:var(--azul)}
+.ferramenta .rot{font-size:10.5px; color:var(--cinza); white-space:nowrap}
+
+/* ── Mesa dividida: itens à esq, resumo à dir ── */
+.mesa{
+  flex:1; position:relative; overflow:hidden; display:flex; gap:0;
+}
+.painel-itens{
+  flex:1; display:flex; flex-direction:column; overflow:hidden; padding:12px 8px 8px 12px;
+}
+.painel-resumo{
+  width:320px; flex-shrink:0; background:rgba(255,255,255,.06); border-left:2px solid rgba(255,255,255,.12);
+  display:flex; flex-direction:column; padding:12px 10px 8px; gap:10px; overflow-y:auto;
+}
+
+/* ── Tabela de itens ── */
+.tabela{width:100%; border-collapse:collapse; font-size:13px}
+.tabela th{
+  background:var(--azul-2); color:#fff; text-align:left; padding:7px 8px;
+  font-size:11px; text-transform:uppercase; letter-spacing:.06em; position:sticky; top:0;
+}
+.tabela td{padding:7px 8px; border-bottom:1px solid var(--linha)}
+.tabela tbody tr{cursor:pointer}
+.tabela tbody tr:hover{background:var(--amarelo-bg)}
+.tabela tbody tr.sel{background:var(--sel); outline:1.5px solid var(--azul-3); outline-offset:-1.5px}
+.tabela .num{text-align:right; font-variant-numeric:tabular-nums}
+.tabela .neg{color:var(--vermelho); font-weight:800}
+.moldura-grid{border:1px solid var(--linha); border-radius:6px; overflow:auto; background:#fff; flex:1}
+
+/* ── Resumo da pré-venda ── */
+.card-resumo{
+  background:#fff; border-radius:10px; padding:14px; font-size:13px; box-shadow:0 4px 18px rgba(0,0,0,.22);
+}
+.card-resumo .tit-card{
+  font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--azul); border-bottom:2px solid var(--amarelo); padding-bottom:4px; margin-bottom:10px;
+}
+.card-resumo .linha-r{display:flex; justify-content:space-between; gap:8px; padding:3px 0}
+.card-resumo .linha-r span{color:var(--cinza)}
+.card-resumo .linha-r b{font-variant-numeric:tabular-nums}
+.total-destaque{
+  background:var(--azul); color:#fff; border-radius:8px; padding:10px 14px;
+  text-align:center; margin-top:4px;
+}
+.total-destaque .label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--amarelo); margin-bottom:3px}
+.total-destaque .valor{font-size:32px; font-weight:900; letter-spacing:-1px}
+
+/* ── Janela flutuante (modal) ── */
+.janela{
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  z-index:200; background:var(--janela); border:1px solid var(--azul-2);
+  box-shadow:0 24px 70px rgba(0,0,0,.55); width:calc(100% - 40px); max-width:780px;
+  border-radius:8px; overflow:hidden; max-height:calc(100dvh - 120px);
+  display:flex; flex-direction:column;
+}
+.janela-cab{
+  background:var(--azul); color:#fff; display:flex; align-items:center;
+  padding:0; user-select:none; flex-shrink:0;
+}
+.janela-cab .dobra{
+  width:56px; align-self:stretch; background:var(--amarelo);
+  clip-path:polygon(0 0, 100% 0, 55% 100%, 0 100%);
+}
+.janela-cab .tit{flex:1; text-align:center; font-weight:800; font-size:15px; padding:9px 6px}
+.janela-cab .fechar{
+  background:none; border:none; color:#fff; font-size:15px; font-weight:800;
+  width:44px; align-self:stretch;
+}
+.janela-cab .fechar:hover{background:var(--vermelho)}
+.janela-corpo{padding:14px; overflow:auto; flex:1}
+.overlay{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:190}
+
+/* ── Campos de formulário ── */
+.btn-acao{
+  border:1px solid var(--linha); background:#fff; border-radius:7px; padding:9px 8px;
+  font-size:12.5px; font-weight:700; color:var(--tinta);
+}
+.btn-acao:hover{border-color:var(--amarelo-2); background:var(--amarelo-bg)}
+.btn-acao.primario{background:var(--amarelo); border-color:var(--amarelo); color:var(--azul); font-weight:800}
+.btn-acao.primario:hover{background:var(--amarelo-2)}
+.btn-acao.perigo{background:var(--vermelho-bg); border-color:var(--vermelho); color:var(--vermelho)}
+.btn-acao.perigo:hover{background:var(--vermelho); color:#fff}
+.btn-acao:disabled{opacity:.5; cursor:not-allowed}
+.rodape-form{display:flex; gap:8px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap}
+.form-linha{display:grid; grid-template-columns:160px 1fr; gap:8px 12px; align-items:center; margin-bottom:9px}
+.form-linha label{font-size:12.5px; font-weight:700; color:var(--azul); text-transform:uppercase; letter-spacing:.03em}
+.form-linha input,.form-linha select{
+  padding:9px 11px; border:1.5px solid var(--linha); border-radius:7px; background:#FAFBFC; width:100%;
+}
+.form-linha input:focus,.form-linha select:focus{outline:2px solid var(--amarelo); border-color:var(--amarelo-2)}
+@media(max-width:600px){.form-linha{grid-template-columns:1fr; gap:3px}}
+
+.linha-consulta{display:flex; gap:8px}
+.linha-consulta input[type=text]{
+  flex:1; padding:9px 12px; border:1.5px solid var(--linha); border-radius:7px; background:var(--amarelo-bg);
+}
+.linha-consulta input[type=text]:focus{outline:2px solid var(--amarelo); border-color:var(--amarelo-2)}
+
+.grade-botoes{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:6px; margin-top:10px}
+
+/* ── Pagamento ── */
+.lista-pgtos{display:flex; flex-direction:column; gap:4px; margin:8px 0}
+.item-pgto{
+  display:flex; align-items:center; gap:8px; background:var(--verde-bg);
+  border:1px solid var(--linha); border-radius:6px; padding:6px 10px; font-size:13px;
+}
+.item-pgto .pgto-esp{flex:1; font-weight:700; color:var(--verde)}
+.item-pgto .pgto-val{font-weight:900; font-variant-numeric:tabular-nums}
+.item-pgto .pgto-del{background:none; border:none; color:var(--vermelho); font-size:13px; padding:2px 6px}
+
+/* ── Status bar ── */
+.statusbar{
+  background:#fff; border-top:2px solid var(--amarelo); padding:6px 12px; font-size:11.5px;
+  color:var(--cinza); display:flex; gap:6px; flex-wrap:wrap; align-items:center; user-select:none;
+}
+.statusbar b{color:var(--azul)}
+.statusbar .logo-st{font-weight:900; font-size:14px; color:var(--azul); margin-right:8px}
+.statusbar .logo-st span{color:var(--amarelo-2)}
+.statusbar .dir{margin-left:auto; text-align:right}
+
+/* ── Login ── */
+.veu-login{
+  position:fixed; inset:0; z-index:300; display:flex; align-items:center; justify-content:center;
+  background:var(--azul);
+  background-image:radial-gradient(circle at 80% 15%, rgba(255,214,10,.15), transparent 45%);
+  padding:20px;
+}
+.janela-login{background:#fff; border-radius:10px; width:100%; max-width:420px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.janela-login .corpo-login{padding:22px; display:flex; gap:18px; align-items:center}
+.logo-login{font-size:44px; font-weight:900; color:var(--azul); line-height:.9; flex-shrink:0; border-right:3px solid var(--amarelo); padding-right:16px}
+.logo-login span{color:var(--amarelo-2)}
+.campos-login{flex:1}
+.campos-login .form-linha{grid-template-columns:80px 1fr}
+.rodape-login{display:flex; gap:8px; justify-content:flex-end; padding:0 22px 20px}
+
+/* ── Toast ── */
+#toast{
+  position:fixed; left:50%; bottom:56px; transform:translateX(-50%) translateY(16px);
+  background:var(--azul); color:#fff; padding:11px 18px; border-radius:9px;
+  font-weight:700; font-size:13.5px; opacity:0; pointer-events:none;
+  transition:all .22s ease; z-index:400; box-shadow:0 10px 34px rgba(0,0,0,.4);
+  max-width:calc(100vw - 30px); text-align:center; border-left:4px solid var(--amarelo);
+}
+#toast.mostra{opacity:1; transform:translateX(-50%) translateY(0)}
+@media(prefers-reduced-motion:reduce){*{transition:none !important}}
+
+/* ── Botões de ação na pré-venda ── */
+.btns-prevenda{display:flex; flex-direction:column; gap:6px; margin-top:auto}
+.btns-prevenda .btn-acao{width:100%; text-align:left; padding:11px 14px; font-size:13px}
+.num-prevenda{
+  background:rgba(255,255,255,.1); border-radius:7px; padding:7px 12px; text-align:center;
+  color:#fff; font-size:12px; font-weight:700; letter-spacing:.05em;
+}
+.num-prevenda b{color:var(--amarelo); font-size:16px}
+
+/* ── Barra de busca de produto ── */
+.barra-busca{
+  display:flex; gap:8px; margin-bottom:10px;
+}
+.barra-busca input{
+  flex:1; padding:9px 12px; border:1.5px solid var(--linha); border-radius:7px;
+  background:#fff; font-size:14px;
+}
+.barra-busca input:focus{outline:2px solid var(--amarelo); border-color:var(--amarelo-2)}
+</style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
+
+<div class="veu-login" id="veu-login">
+  <div class="janela-login">
+    <div class="janela-cab"><div class="dobra"></div><div class="tit">ESTOCAAÍ CAIXA — PRÉ-VENDA</div></div>
+    <div class="corpo-login">
+      <div class="logo-login">C<span>x</span></div>
+      <div class="campos-login">
+        <div class="form-linha"><label for="lg-emp">Filial</label>
+          <select id="lg-emp">
+            <option value="par">1 — Parnamirim</option>
+            <option value="mac">2 — Macaíba</option>
+            <option value="nat">3 — Natal</option>
+          </select>
+        </div>
+        <div class="form-linha"><label for="lg-usr">Usuário</label><input id="lg-usr" autocomplete="username" placeholder="e-mail ou username"></div>
+        <div class="form-linha"><label for="lg-sen">Senha</label><input id="lg-sen" type="password" autocomplete="current-password" placeholder="••••••"></div>
+      </div>
+    </div>
+    <div class="rodape-login">
+      <button class="btn-acao primario" id="btn-entrar" style="min-width:110px" onclick="entrar()"><u>O</u>k</button>
+    </div>
+  </div>
+</div>
+
+<div class="titulo-sis">ESTOCAAÍ <span>CAIXA</span> — PRÉ-VENDA / EMISSOR NFC-e</div>
+<nav class="menubar" id="menubar"></nav>
+<div class="toolbar" id="toolbar"></div>
+
+<div class="mesa" id="mesa">
+  <!-- Coluna esquerda: itens da pré-venda -->
+  <div class="painel-itens">
+    <div class="barra-busca">
+      <input type="text" id="in-busca" placeholder="Buscar produto por nome, código ou código de barras… (Enter para adicionar)" autocomplete="off">
+      <button class="btn-acao primario" onclick="abrirBuscarProduto()">🔍 Buscar (F7)</button>
+    </div>
+    <div class="moldura-grid">
+      <table class="tabela" id="grid-itens">
+        <thead><tr>
+          <th>#</th><th>Código</th><th>Descrição</th>
+          <th class="num">Qtd</th><th class="num">Unit (R$)</th><th class="num">Total (R$)</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="tbody-itens">
+          <tr><td colspan="7" style="text-align:center;color:var(--cinza);padding:28px">
+            Nenhum item adicionado. Use F7 para buscar produtos ou digite na barra acima.
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Coluna direita: resumo e ações -->
+  <div class="painel-resumo">
+    <div class="num-prevenda">Pré-Venda Nº <b id="num-pv">—</b></div>
+
+    <div class="card-resumo">
+      <div class="tit-card">Resumo</div>
+      <div class="linha-r"><span>Itens:</span><b id="res-itens">0</b></div>
+      <div class="linha-r"><span>Subtotal:</span><b id="res-subtotal">R$ 0,00</b></div>
+      <div class="linha-r"><span>Desconto:</span><b id="res-desconto">—</b></div>
+      <div class="total-destaque">
+        <div class="label">Total a pagar</div>
+        <div class="valor" id="res-total">R$ 0,00</div>
+      </div>
+    </div>
+
+    <div class="card-resumo">
+      <div class="tit-card">Vendedor / Cliente</div>
+      <div class="linha-r"><span>Vendedor:</span><b id="info-vendedor">—</b></div>
+      <div class="linha-r"><span>Cliente:</span><b id="info-cliente">—</b></div>
+      <div class="linha-r"><span>Filial:</span><b id="info-filial">—</b></div>
+    </div>
+
+    <div class="btns-prevenda">
+      <button class="btn-acao primario" onclick="abrirBuscarProduto()"><kbd>F7</kbd> — Buscar Produto</button>
+      <button class="btn-acao" onclick="janelaEmitir()"><kbd>F9</kbd> — Emitir NFC-e</button>
+      <button class="btn-acao" onclick="janelaCancelar()"><kbd>F8</kbd> — Cancelar Pré-Venda</button>
+      <button class="btn-acao" onclick="janelaNovaPreVenda()"><kbd>F2</kbd> — Nova Pré-Venda</button>
+      <button class="btn-acao" onclick="janelaPreVendasAbertas()"><kbd>F3</kbd> — Pré-Vendas Abertas</button>
+      <button class="btn-acao" onclick="janelaVendasFinalizadas()"><kbd>F4</kbd> — Histórico de Vendas</button>
+    </div>
+  </div>
+</div>
+
+<footer class="statusbar">
+  <span class="logo-st">C<span>x</span></span>
+  <span>Usuário: <b id="st-usuario">—</b></span> |
+  <span>Filial: <b id="st-filial">—</b></span> |
+  <span>Pré-Venda: <b id="st-pv">—</b></span>
+  <span class="dir" id="st-relogio"></span>
+</footer>
+
+<div id="toast" role="status"></div>
+
+<script type="module" src="/src/main.js"></script>
 </body>
 </html>
