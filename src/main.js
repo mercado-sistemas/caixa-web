@@ -70,17 +70,24 @@ function fecharJanela() {
 
 // ─── Login ────────────────────────────────────────────────────────────────────
 async function entrar() {
-  const loginVal = $('#lg-usr').value.trim();
-  const senhaVal = $('#lg-sen').value.trim();
+  const filialVal = $('#lg-filial').value.trim().toUpperCase();
+  const loginVal  = $('#lg-usr').value.trim();
+  const senhaVal  = $('#lg-sen').value.trim();
+  const ehEmail   = loginVal.includes('@');
+
+  if (!ehEmail && !filialVal) return toast('Informe o ID da filial.');
   if (!loginVal) return toast('Informe o usuário.');
   if (!senhaVal) return toast('Informe a senha.');
 
   const btn = $('#btn-entrar');
   btn.disabled = true; btn.textContent = 'Verificando…';
   try {
+    const body = { login: loginVal, senha: senhaVal };
+    if (!ehEmail) body.filial = filialVal; // funcionário: filial+usuário+senha juntos identificam o tenant
+
     const r = await fetch(`${EBFF}/api/auth/login`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ login: loginVal, senha: senhaVal }),
+      body: JSON.stringify(body),
     });
     const dados = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(dados.erro || dados.message || `Erro ${r.status}`);
@@ -88,18 +95,23 @@ async function entrar() {
     auth.set(dados.token);
     sessao = dados;
 
-    if (dados.role === 'ADMIN') {
-      try {
-        const lojas = await estoqueApi('/lojas');
-        if (lojas?.length > 0) FILIAIS = lojas;
-      } catch (_) {
-        if (dados.lojas?.length > 0) FILIAIS = dados.lojas;
-      }
-    } else {
+    $('#veu-login').classList.add('hide');
+
+    // Funcionário: a filial já veio validada pelo backend (filial+usuário+senha).
+    if (!ehEmail) {
       FILIAIS = dados.lojas || [];
+      filialAtual = filialVal;
+      await entrarNoCaixa(dados, loginVal);
+      return;
     }
 
-    $('#veu-login').classList.add('hide');
+    // Gestor/dono (login por e-mail): pode ter várias lojas, escolhe depois de entrar.
+    try {
+      const lojas = await estoqueApi('/lojas');
+      if (lojas?.length > 0) FILIAIS = lojas;
+    } catch (_) {
+      if (dados.lojas?.length > 0) FILIAIS = dados.lojas;
+    }
 
     if (FILIAIS.length === 1) {
       filialAtual = FILIAIS[0].id;
