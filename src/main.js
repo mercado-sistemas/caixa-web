@@ -79,7 +79,8 @@ async function entrar() {
   const btn = $('#btn-entrar');
   btn.disabled = true; btn.textContent = 'Verificando…';
   try {
-    const r = await fetch(`${BFF}/api/auth/login`, {
+    // Auth fica no estocaai-bff, não no caixa-bff
+    const r = await fetch(`${EBFF}/api/auth/login`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ login: loginVal, senha: senhaVal }),
     });
@@ -672,7 +673,23 @@ function relogio() {
 }
 setInterval(relogio, 1000); relogio();
 $('#lg-sen').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
+$('#lg-usr').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 montarMenus(); montarToolbar();
+
+// Carrega filiais antes do login (endpoint público)
+(async () => {
+  try {
+    const lojas = await fetch(`${EBFF}/api/lojas`).then(r => r.ok ? r.json() : []);
+    if (lojas && lojas.length > 0) {
+      FILIAIS = lojas;
+      const sel = $('#lg-emp');
+      if (sel) sel.innerHTML = FILIAIS.map(f => `<option value="${f.id}">${f.nome}</option>`).join('');
+    }
+  } catch (_) {
+    const sel = $('#lg-emp');
+    if (sel) sel.innerHTML = '<option value="">Selecionar após login</option>';
+  }
+})();
 
 // ─── Global ───────────────────────────────────────────────────────────────────
 Object.assign(window, {
