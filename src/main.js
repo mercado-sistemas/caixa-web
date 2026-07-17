@@ -85,7 +85,7 @@ async function entrar() {
     const body = { login: loginVal, senha: senhaVal };
     if (!ehEmail) body.filial = filialVal; // funcionário: filial+usuário+senha juntos identificam o tenant
 
-    const r = await fetch(`${EBFF}/api/auth/login`, {
+    const r = await fetch(`${BFF}/api/auth/login`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -107,7 +107,7 @@ async function entrar() {
 
     // Gestor/dono (login por e-mail): pode ter várias lojas, escolhe depois de entrar.
     try {
-      const lojas = await estoqueApi('/lojas');
+      const lojas = await caixaApi('/lojas');
       if (lojas?.length > 0) FILIAIS = lojas;
     } catch (_) {
       if (dados.lojas?.length > 0) FILIAIS = dados.lojas;
