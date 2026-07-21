@@ -137,6 +137,57 @@ async function entrar() {
   }
 }
 
+// ─── Entrada vinda do Estocaaí (SSO) ──────────────────────────────────────────
+// O estoque abre o caixa com #sso=<token> no hash. O token é o mesmo JWT emitido
+// pela estocaai-api, que a caixa-api também valida — então basta reaproveitá-lo
+// e pular a tela de login. Usa hash (e não query) para o token não ir parar em
+// log de servidor nem no header Referer.
+async function entrarViaSSO(token) {
+  auth.set(token);
+  const claims = lerClaims(token);
+  const dados = { nome: claims.nome || claims.sub, role: claims.role, token };
+  sessao = dados;
+
+  try {
+    FILIAIS = await caixaApi('/lojas');
+  } catch (e) {
+    auth.clear();
+    toast('Sessão do estoque não aceita aqui: ' + e.message);
+    return;
+  }
+
+  $('#veu-login').classList.add('hide');
+
+  if (FILIAIS.length === 1) {
+    filialAtual = FILIAIS[0].id;
+    await entrarNoCaixa(dados, dados.nome || '');
+  } else if (FILIAIS.length > 1) {
+    const lista = $('#lista-filiais-picker');
+    lista.innerHTML = FILIAIS.map((f, i) =>
+      `<button class="btn-acao" style="text-align:left; padding:12px 16px; font-size:14px"
+         onclick="selecionarFilialLogin('${f.id}')">
+         <b>${i + 1}</b> — ${f.nome}
+       </button>`
+    ).join('');
+    $('#veu-filial').classList.remove('hide');
+    window._dadosLogin = dados;
+    window._loginVal = dados.nome || '';
+  } else {
+    filialAtual = null;
+    await entrarNoCaixa(dados, dados.nome || '');
+  }
+}
+
+/** Lê o payload do JWT só para exibir nome/perfil — quem valida é a API. */
+function lerClaims(token) {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(payload))));
+  } catch (_) {
+    return {};
+  }
+}
+
 async function selecionarFilialLogin(id) {
   filialAtual = id;
   $('#veu-filial').classList.add('hide');
@@ -282,6 +333,8 @@ function abrirBuscarProduto() {
     <div class="linha-consulta" style="margin-bottom:10px">
       <input type="text" id="bp-in" placeholder="Nome, código ou código de barras… (Enter para pesquisar)" autocomplete="off">
       <button class="btn-acao" onclick="buscarProduto()">Buscar</button>
+      <button class="btn-acao primario" type="button" onclick="escanearPeloCelular()"
+              title="Escanear código de barras pelo celular">📷 Escanear</button>
     </div>
     <div class="moldura-grid" style="max-height:300px"><table class="tabela" id="grid-bp">
       <thead><tr><th>Código</th><th>Descrição</th><th class="num">Saldo ${nomeFil(filialAtual)}</th><th class="num">Preço</th></tr></thead>
@@ -699,6 +752,12 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { fecharMenus(); fecharJanela(); }
 });
 
+// ─── Escanear pelo celular ────────────────────────────────────────────────────
+// Botão reservado: a leitura pelo celular ainda não foi implementada.
+function escanearPeloCelular() {
+  toast('Leitura pelo celular ainda não disponível.');
+}
+
 // ─── Relógio ──────────────────────────────────────────────────────────────────
 function relogio() {
   const d = new Date();
@@ -709,11 +768,22 @@ $('#lg-sen').addEventListener('keydown', e => { if (e.key === 'Enter') entrar();
 $('#lg-usr').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 montarMenus(); montarToolbar();
 
+// Se o Estocaaí abriu o caixa com #sso=<token>, entra direto no perfil que já
+// estava logado lá. O hash é limpo em seguida para o token não ficar na barra.
+(function iniciarSSO() {
+  const m = location.hash.match(/[#&]sso=([^&]+)/);
+  if (!m) return;
+  const token = decodeURIComponent(m[1]);
+  history.replaceState(null, '', location.pathname + location.search);
+  entrarViaSSO(token);
+})();
+
 
 // ─── Global ───────────────────────────────────────────────────────────────────
 Object.assign(window, {
   entrar, selecionarFilialLogin, fecharJanela, fecharMenus,
   abrirBuscarProduto, buscarProduto, selecionarProdutoBusca, adicionarItem,
+  escanearPeloCelular,
   janelaEmitir, adicionarPagamento, removePagamento, confirmarEmissao,
   janelaCancelar, confirmarCancelamento,
   janelaNovaPreVenda, confirmarNovaPV,
