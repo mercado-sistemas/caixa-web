@@ -112,7 +112,7 @@ export default function ScannerCamera({ onDetected, onClose }) {
   }, [onClose]);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'relative', width: 'min(92vw, 480px)', aspectRatio: '4 / 3', background: '#000', borderRadius: 10, overflow: 'hidden' }}>
         <video ref={videoRef} playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         {/* moldura-alvo */}
