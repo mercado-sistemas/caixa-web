@@ -157,6 +157,11 @@ kbd{font-family:inherit; font-weight:800; font-size:11px; color:var(--cinza)}
 }
 .form-linha input:focus,.form-linha select:focus{outline:2px solid var(--amarelo); border-color:var(--amarelo-2)}
 @media(max-width:600px){.form-linha{grid-template-columns:1fr; gap:3px}}
+@media(max-width:760px){
+  /* fonte 16px no foco evita o zoom automático do iOS nos campos */
+  .form-linha input,.form-linha select,.linha-consulta input,.janela-corpo textarea{font-size:16px}
+  .linha-consulta{flex-wrap:wrap}
+}
 
 .linha-consulta{display:flex; gap:8px}
 .linha-consulta input[type=text]{
