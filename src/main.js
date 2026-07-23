@@ -1,4 +1,4 @@
-import { abrirBuscarProdutoReact, abrirIdentificarClienteReact, fecharModalReact } from './montar.jsx';
+import { abrirBuscarProdutoReact, abrirIdentificarClienteReact, abrirPreVendasAbertasReact, abrirVendasFinalizadasReact, fecharModalReact } from './montar.jsx';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const BFF   = import.meta.env.VITE_BFF_URL;          // caixa-bff (pré-vendas)
@@ -473,77 +473,22 @@ async function confirmarNovaPV() {
   }
 }
 
-// ─── F3 Pré-Vendas Abertas ────────────────────────────────────────────────────
-async function janelaPreVendasAbertas() {
-  abrirJanela('Pré-Vendas Abertas', `
-    <div class="moldura-grid" style="max-height:380px"><table class="tabela">
-      <thead><tr>
-        <th class="num">Nº</th><th>Vendedor</th><th>Filial</th>
-        <th class="num">Itens</th><th class="num">Total</th><th>Aberta em</th><th></th>
-      </tr></thead>
-      <tbody><tr><td colspan="7" style="text-align:center;color:var(--cinza);padding:18px">Carregando…</td></tr></tbody>
-    </table></div>
-    <div class="rodape-form"><button class="btn-acao" onclick="fecharJanela()">Fechar</button></div>`, 840);
-  try {
-    const pvs = await caixaApi('/prevendas');
-    const tb = document.querySelector('#janela-ativa .tabela tbody');
-    if (!tb) return;
-    tb.innerHTML = pvs.map(pv => {
-      const total = (pv.itens || []).reduce((s, i) => s + (i.unit || 0) * (i.qtd || 0), 0);
-      return `<tr onclick="carregarPreVenda(${pv.num})">
-        <td class="num" style="font-weight:900">#${pv.num}</td>
-        <td>${pv.vendedor || '—'}</td>
-        <td>${nomeFil(pv.filial)}</td>
-        <td class="num">${(pv.itens || []).length}</td>
-        <td class="num">R$ ${brl(total)}</td>
-        <td style="font-size:11px">${pv.criadaEm ? new Date(pv.criadaEm).toLocaleString('pt-BR') : '—'}</td>
-        <td><button class="btn-acao primario" style="padding:3px 10px; font-size:11px" onclick="event.stopPropagation(); carregarPreVenda(${pv.num})">Abrir</button></td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--cinza);padding:18px">Nenhuma pré-venda em aberto.</td></tr>';
-  } catch (e) { toast(e.message); }
+// ─── F3 Pré-Vendas Abertas / F4 Vendas Finalizadas (React: src/vendas/) ──────
+/* Migradas pela segurança: o vendedor vai para a grade e antes ia por innerHTML.
+   O main.js segue dono do estado: abrir uma pré-venda volta pelo callback. */
+function janelaPreVendasAbertas() {
+  fecharJanela();
+  abrirPreVendasAbertasReact({
+    caixaApi, toast, nomeFil,
+    onCarregar(pv) { preVenda = pv; pagamentos = []; atualizarUI(); },
+  });
 }
 
-function carregarPreVenda(num) {
-  // busca na lista já carregada ou via endpoint
-  caixaApi('/prevendas').then(pvs => {
-    const pv = pvs.find(x => x.num === num);
-    if (!pv) return toast(`Pré-venda #${num} não encontrada.`);
-    preVenda = pv;
-    pagamentos = [];
-    atualizarUI();
-    fecharJanela();
-    toast(`Pré-venda <b>#${num}</b> carregada.`);
-  }).catch(e => toast(e.message));
+function janelaVendasFinalizadas() {
+  fecharJanela();
+  abrirVendasFinalizadasReact({ caixaApi, toast, nomeFil });
 }
 
-// ─── F4 Histórico de Vendas ───────────────────────────────────────────────────
-async function janelaVendasFinalizadas() {
-  abrirJanela('Histórico de Vendas Finalizadas', `
-    <div class="moldura-grid" style="max-height:400px"><table class="tabela">
-      <thead><tr>
-        <th class="num">Nº</th><th>Vendedor</th><th>Filial</th>
-        <th class="num">Itens</th><th class="num">Total</th><th>Emitida em</th>
-      </tr></thead>
-      <tbody><tr><td colspan="6" style="text-align:center;color:var(--cinza);padding:18px">Carregando…</td></tr></tbody>
-    </table></div>
-    <div class="rodape-form"><button class="btn-acao" onclick="fecharJanela()">Fechar</button></div>`, 840);
-  try {
-    const vendas = await caixaApi('/vendas');
-    const tb = document.querySelector('#janela-ativa .tabela tbody');
-    if (!tb) return;
-    tb.innerHTML = vendas.map(v => {
-      const total = (v.itens || []).reduce((s, i) => s + (i.unit || 0) * (i.qtd || 0), 0);
-      return `<tr>
-        <td class="num">${v.num}</td>
-        <td>${v.vendedor || '—'}</td>
-        <td>${nomeFil(v.filial)}</td>
-        <td class="num">${(v.itens || []).length}</td>
-        <td class="num" style="font-weight:900">R$ ${brl(total)}</td>
-        <td style="font-size:11px">${v.emitidaEm ? new Date(v.emitidaEm).toLocaleString('pt-BR') : '—'}</td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--cinza);padding:18px">Nenhuma venda finalizada.</td></tr>';
-  } catch (e) { toast(e.message); }
-}
 
 // ─── Menus ────────────────────────────────────────────────────────────────────
 const MENUS = [
@@ -658,7 +603,7 @@ Object.assign(window, {
   janelaEmitir, adicionarPagamento, removePagamento, confirmarEmissao,
   janelaCancelar, confirmarCancelamento,
   janelaNovaPreVenda, confirmarNovaPV,
-  janelaPreVendasAbertas, carregarPreVenda,
+  janelaPreVendasAbertas,
   janelaVendasFinalizadas,
   janelaIdentificarCliente,
   removerItem, nomeFil,
