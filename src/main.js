@@ -135,13 +135,21 @@ async function entrar() {
       window._dadosLogin = dados;
       window._loginVal = loginVal;
     } else {
-      filialAtual = null;
-      await entrarNoCaixa(dados, loginVal);
+      bloquearSemFilial();
     }
   } catch (e) {
     toast(e.message);
     btn.disabled = false; btn.textContent = 'Ok';
   }
+}
+
+// Sem filial cadastrada o caixa não abre pré-venda. Em vez de entrar e falhar,
+// volta para a tela inicial com um aviso claro (a filial se cadastra no Estoque).
+function bloquearSemFilial() {
+  $('#veu-filial')?.classList.add('hide');
+  $('#veu-login')?.classList.remove('hide');
+  auth.clear();
+  toast('Nenhuma filial cadastrada. Cadastre uma filial no Estocaaí (Estoque) antes de usar o caixa.');
 }
 
 // ─── Entrada vinda do Estocaaí (SSO) ──────────────────────────────────────────
@@ -180,8 +188,7 @@ async function entrarViaSSO(token) {
     window._dadosLogin = dados;
     window._loginVal = dados.nome || '';
   } else {
-    filialAtual = null;
-    await entrarNoCaixa(dados, dados.nome || '');
+    bloquearSemFilial();
   }
 }
 
@@ -455,6 +462,15 @@ document.addEventListener('keydown', e => {
 
 // ─── Escanear pelo celular ────────────────────────────────────────────────────
 // Botão reservado: a leitura pelo celular ainda não foi implementada.
+// Recolhe/expande a lista de itens no celular, para dar espaço ao resumo.
+function alternarItens() {
+  const painel = document.querySelector('.painel-itens');
+  if (!painel) return;
+  const recolhido = painel.classList.toggle('recolhido');
+  const btn = $('#btn-recolher-itens');
+  if (btn) btn.textContent = recolhido ? '▼ Itens' : '▲ Itens';
+}
+
 function escanearPeloCelular() {
   toast('Leitura pelo celular ainda não disponível.');
 }
@@ -483,7 +499,7 @@ montarMenus(); montarToolbar();
 // ─── Global ───────────────────────────────────────────────────────────────────
 Object.assign(window, {
   entrar, selecionarFilialLogin, fecharJanela, fecharMenus,
-  abrirBuscarProduto,
+  abrirBuscarProduto, alternarItens,
   escanearPeloCelular,
   janelaEmitir,
   janelaCancelar,

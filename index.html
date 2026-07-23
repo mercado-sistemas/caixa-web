@@ -161,7 +161,16 @@ kbd{font-family:inherit; font-weight:800; font-size:11px; color:var(--cinza)}
   /* fonte 16px no foco evita o zoom automático do iOS nos campos */
   .form-linha input,.form-linha select,.linha-consulta input,.janela-corpo textarea{font-size:16px}
   .linha-consulta{flex-wrap:wrap}
+
+  /* No celular as colunas empilham: itens em cima, resumo embaixo — nada fica
+     preso num filete. O botão recolhe a lista de itens para ver o resumo. */
+  .mesa{flex-direction:column; overflow-y:auto}
+  .painel-itens{overflow:visible; padding:10px}
+  .painel-resumo{width:auto; flex-shrink:1; border-left:none; border-top:2px solid rgba(255,255,255,.12)}
+  .painel-itens.recolhido .moldura-grid{display:none}
+  .btn-recolher{display:inline-flex}
 }
+.btn-recolher{display:none; align-items:center; justify-content:center; padding:9px 12px}
 
 .linha-consulta{display:flex; gap:8px}
 .linha-consulta input[type=text]{
@@ -277,6 +286,8 @@ kbd{font-family:inherit; font-weight:800; font-size:11px; color:var(--cinza)}
     <div class="barra-busca">
       <input type="text" id="in-busca" placeholder="Buscar produto por nome, código ou código de barras… (Enter para adicionar)" autocomplete="off">
       <button class="btn-acao primario" onclick="abrirBuscarProduto()">🔍 Buscar (F7)</button>
+      <button class="btn-acao btn-recolher" id="btn-recolher-itens" onclick="alternarItens()"
+              title="Recolher/expandir a lista de itens">▲ Itens</button>
     </div>
     <div class="moldura-grid">
       <table class="tabela" id="grid-itens">
