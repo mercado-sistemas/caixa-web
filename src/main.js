@@ -1,4 +1,4 @@
-import { abrirBuscarProdutoReact, abrirIdentificarClienteReact, abrirPreVendasAbertasReact, abrirVendasFinalizadasReact, fecharModalReact } from './montar.jsx';
+import { abrirBuscarProdutoReact, abrirIdentificarClienteReact, abrirPreVendasAbertasReact, abrirVendasFinalizadasReact, abrirEmitirReact, abrirCancelarReact, abrirNovaPreVendaReact, fecharModalReact } from './montar.jsx';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const BFF   = import.meta.env.VITE_BFF_URL;          // caixa-bff (pré-vendas)
@@ -38,6 +38,10 @@ let pagamentos  = [];    // lista de pagamentos acumulados antes de emitir
 const $ = s => document.querySelector(s);
 const brl = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const nomeFil = id => FILIAIS.find(f => f.id === id)?.nome || id || '—';
+// Escapa texto antes de ir para innerHTML nas partes ainda em vanilla (a shell).
+// As telas de dado de terceiro já são React; isto protege a grade de itens, que
+// mostra nome de produto (dado de terceiro) e é redesenhada a cada venda.
+const esc = s => String(s ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 
 function toast(m) {
   const t = $('#toast');
@@ -238,8 +242,8 @@ function atualizarUI() {
   tb.innerHTML = itens.map((it, idx) => `
     <tr class="${idx === itens.length - 1 ? 'sel' : ''}">
       <td class="num">${idx + 1}</td>
-      <td class="num">${it.cod || '—'}</td>
-      <td>${it.nome}</td>
+      <td class="num">${esc(it.cod) || '—'}</td>
+      <td>${esc(it.nome)}</td>
       <td class="num">${it.qtd}</td>
       <td class="num">${brl(it.unit)}</td>
       <td class="num" style="font-weight:900">${brl((it.unit || 0) * (it.qtd || 0))}</td>
@@ -305,173 +309,54 @@ function abrirBuscarProduto() {
 }
 
 
-// ─── F9 Emitir NFC-e ─────────────────────────────────────────────────────────
+// ─── Ações da pré-venda (React: src/vendas/AcoesModais.jsx) ──────────────────
+/* Emitir (F9), Cancelar (F8) e Nova (F2). Baixo risco de XSS; migradas para
+   fechar o caixa-web em React. O main.js segue dono do estado: ao concluir, o
+   componente chama onConcluida(), que reseta e abre nova pré-venda. */
+const totalPreVenda = () => (preVenda?.itens || []).reduce((s, i) => s + (i.unit || 0) * (i.qtd || 0), 0);
+
 function janelaEmitir() {
   if (!preVenda) return toast('Sem pré-venda ativa.');
   if (!(preVenda.itens?.length)) return toast('Adicione itens antes de emitir.');
-  const total = (preVenda.itens || []).reduce((s, i) => s + (i.unit || 0) * (i.qtd || 0), 0);
-
-  const optsEsp = [
-    'DINHEIRO','PIX','CARTAO','CREDITO_CLIENTE','CHEQUE',
-    'BOLETO','DUPLICATA','NOTA_PROMISSORIA','PRAZO',
-    'CREDITO_FORNECEDOR','TRANSFERENCIA_BANCARIA','OUTROS',
-  ].map(e => `<option value="${e}">${e.replace(/_/g, ' ')}</option>`).join('');
-
-  abrirJanela('Emitir NFC-e — Pagamento', `
-    <div style="font-size:13px; margin-bottom:12px">
-      <b>Total da venda: <span style="font-size:22px; color:var(--azul)">R$ ${brl(total)}</span></b>
-    </div>
-
-    <div class="lista-pgtos" id="lista-pgtos"></div>
-
-    <div style="border-top:1px solid var(--linha); padding-top:10px; margin-top:6px">
-      <div class="form-linha"><label>Forma de Pagamento</label>
-        <select id="pg-esp">${optsEsp}</select>
-      </div>
-      <div class="form-linha"><label>Valor (R$)</label>
-        <input id="pg-val" type="number" step="any" min="0.01" inputmode="decimal" placeholder="0,00">
-      </div>
-      <div style="text-align:right; margin-bottom:6px">
-        <button class="btn-acao" onclick="adicionarPagamento()">+ Adicionar forma de pagamento</button>
-      </div>
-    </div>
-
-    <div id="resumo-pgto" style="font-size:12.5px; color:var(--cinza); margin-bottom:10px"></div>
-
-    <div class="rodape-form">
-      <button class="btn-acao" onclick="fecharJanela()">Cancelar</button>
-      <button class="btn-acao primario" id="btn-emitir" onclick="confirmarEmissao()">🧾 Emitir NFC-e</button>
-    </div>`, 640);
-
-  renderPagamentos(total);
-  const totalPendente = total - pagamentos.reduce((s, p) => s + p.valor, 0);
-  if ($('#pg-val')) $('#pg-val').value = totalPendente > 0 ? totalPendente.toFixed(2) : '';
+  fecharJanela();
+  abrirEmitirReact({
+    caixaApi, toast,
+    preVendaNum: preVenda.num,
+    total: totalPreVenda(),
+    authToken: _token,
+    async onConcluida() { preVenda = null; pagamentos = []; await criarNovaPreVenda(); },
+  });
 }
 
-function renderPagamentos(total) {
-  const lista = $('#lista-pgtos');
-  const resumo = $('#resumo-pgto');
-  if (!lista) return;
-  const pago = pagamentos.reduce((s, p) => s + p.valor, 0);
-
-  lista.innerHTML = pagamentos.map((p, i) => `
-    <div class="item-pgto">
-      <span class="pgto-esp">${p.especie.replace(/_/g, ' ')}</span>
-      <span class="pgto-val">R$ ${brl(p.valor)}</span>
-      <button class="pgto-del" onclick="removePagamento(${i})">✕</button>
-    </div>`).join('') || '<div style="color:var(--cinza); font-size:12.5px">Nenhum pagamento adicionado.</div>';
-
-  if (resumo) {
-    const troco = pago - (total || 0);
-    resumo.innerHTML = `Pago: <b>R$ ${brl(pago)}</b> | Pendente: <b>R$ ${brl(Math.max(0, (total || 0) - pago))}</b>` +
-      (troco > 0 ? ` | <b style="color:var(--verde)">Troco: R$ ${brl(troco)}</b>` : '');
-  }
-}
-
-function adicionarPagamento() {
-  const esp = $('#pg-esp')?.value;
-  const val = parseFloat($('#pg-val')?.value);
-  if (!esp) return toast('Selecione a forma de pagamento.');
-  if (!val || val <= 0) return toast('Informe o valor do pagamento.');
-  pagamentos.push({ especie: esp, valor: val });
-  const total = (preVenda.itens || []).reduce((s, i) => s + (i.unit || 0) * (i.qtd || 0), 0);
-  renderPagamentos(total);
-  if ($('#pg-val')) $('#pg-val').value = '';
-}
-
-function removePagamento(idx) {
-  pagamentos.splice(idx, 1);
-  const total = (preVenda?.itens || []).reduce((s, i) => s + (i.unit || 0) * (i.qtd || 0), 0);
-  renderPagamentos(total);
-}
-
-async function confirmarEmissao() {
-  if (!preVenda) return toast('Sem pré-venda ativa.');
-  if (!pagamentos.length) return toast('Adicione ao menos um pagamento.');
-  const total = (preVenda.itens || []).reduce((s, i) => s + (i.unit || 0) * (i.qtd || 0), 0);
-  const pago = pagamentos.reduce((s, p) => s + p.valor, 0);
-  if (pago < total - 0.005) return toast(`Valor pago (R$ ${brl(pago)}) menor que o total (R$ ${brl(total)}).`);
-
-  const btn = $('#btn-emitir');
-  btn.disabled = true; btn.textContent = 'Emitindo…';
-  try {
-    const r = await caixaApi(`/prevendas/${preVenda.num}/emitir`, {
-      method: 'POST',
-      body: { pagamentos, authToken: _token },
-    });
-    fecharJanela();
-    toast(`NFC-e emitida! <b>#${preVenda.num}</b> — ${(preVenda.itens || []).length} item(ns).`);
-    preVenda = null;
-    pagamentos = [];
-    await criarNovaPreVenda();
-  } catch (e) {
-    toast(e.message);
-    btn.disabled = false; btn.textContent = '🧾 Emitir NFC-e';
-  }
-}
-
-// ─── F8 Cancelar ─────────────────────────────────────────────────────────────
 function janelaCancelar() {
   if (!preVenda) return toast('Sem pré-venda ativa.');
-  abrirJanela('Cancelar Pré-Venda', `
-    <div style="text-align:center; padding:14px 0">
-      <div style="font-size:38px; margin-bottom:10px">🗑️</div>
-      <b style="font-size:15px">Pré-Venda #${preVenda.num}</b><br>
-      <span style="color:var(--cinza); font-size:13px">${(preVenda.itens || []).length} item(ns) · Total R$ ${brl((preVenda.itens || []).reduce((s, i) => s + (i.unit || 0) * (i.qtd || 0), 0))}</span><br><br>
-      Tem certeza que deseja <b style="color:var(--vermelho)">cancelar</b> esta pré-venda?
-    </div>
-    <div class="rodape-form">
-      <button class="btn-acao" onclick="fecharJanela()">Não, manter</button>
-      <button class="btn-acao perigo" id="btn-cancel" onclick="confirmarCancelamento()">Sim, cancelar</button>
-    </div>`, 460);
+  fecharJanela();
+  abrirCancelarReact({
+    caixaApi, toast,
+    preVendaNum: preVenda.num,
+    qtdItens: (preVenda.itens || []).length,
+    total: totalPreVenda(),
+    async onConcluida() { preVenda = null; pagamentos = []; await criarNovaPreVenda(); },
+  });
 }
 
-async function confirmarCancelamento() {
-  if (!preVenda) return;
-  const btn = $('#btn-cancel');
-  btn.disabled = true; btn.textContent = 'Cancelando…';
-  try {
-    await caixaApi(`/prevendas/${preVenda.num}`, { method: 'DELETE' });
-    fecharJanela();
-    toast(`Pré-venda <b>#${preVenda.num}</b> cancelada.`);
-    preVenda = null; pagamentos = [];
-    await criarNovaPreVenda();
-  } catch (e) {
-    toast(e.message);
-    btn.disabled = false; btn.textContent = 'Sim, cancelar';
-  }
-}
-
-// ─── F2 Nova Pré-Venda ────────────────────────────────────────────────────────
 function janelaNovaPreVenda() {
   if (preVenda && (preVenda.itens || []).length > 0) {
-    abrirJanela('Nova Pré-Venda', `
-      <div style="text-align:center; padding:14px 0">
-        <div style="font-size:38px; margin-bottom:10px">📋</div>
-        Já existe a pré-venda <b>#${preVenda.num}</b> com <b>${(preVenda.itens || []).length}</b> item(ns).<br>
-        Deseja <b>abandoná-la</b> e abrir uma nova?
-      </div>
-      <div class="rodape-form">
-        <button class="btn-acao" onclick="fecharJanela()">Não, manter</button>
-        <button class="btn-acao primario" id="btn-nova" onclick="confirmarNovaPV()">Sim, nova pré-venda</button>
-      </div>`, 460);
+    fecharJanela();
+    abrirNovaPreVendaReact({
+      toast,
+      preVendaNum: preVenda.num,
+      qtdItens: (preVenda.itens || []).length,
+      async onConcluida() {
+        if (preVenda) await caixaApi(`/prevendas/${preVenda.num}`, { method: 'DELETE' }).catch(() => {});
+        await criarNovaPreVenda();
+      },
+    });
   } else {
     criarNovaPreVenda();
   }
 }
 
-async function confirmarNovaPV() {
-  const btn = $('#btn-nova');
-  btn.disabled = true; btn.textContent = 'Criando…';
-  try {
-    if (preVenda) await caixaApi(`/prevendas/${preVenda.num}`, { method: 'DELETE' }).catch(() => {});
-    fecharJanela();
-    await criarNovaPreVenda();
-  } catch (e) {
-    toast(e.message);
-    btn.disabled = false; btn.textContent = 'Sim, nova pré-venda';
-  }
-}
 
 // ─── F3 Pré-Vendas Abertas / F4 Vendas Finalizadas (React: src/vendas/) ──────
 /* Migradas pela segurança: o vendedor vai para a grade e antes ia por innerHTML.
@@ -600,9 +485,9 @@ Object.assign(window, {
   entrar, selecionarFilialLogin, fecharJanela, fecharMenus,
   abrirBuscarProduto,
   escanearPeloCelular,
-  janelaEmitir, adicionarPagamento, removePagamento, confirmarEmissao,
-  janelaCancelar, confirmarCancelamento,
-  janelaNovaPreVenda, confirmarNovaPV,
+  janelaEmitir,
+  janelaCancelar,
+  janelaNovaPreVenda,
   janelaPreVendasAbertas,
   janelaVendasFinalizadas,
   janelaIdentificarCliente,

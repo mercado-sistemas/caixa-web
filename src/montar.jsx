@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import BuscarProdutoModal from './produto/BuscarProdutoModal.jsx';
 import IdentificarClienteModal from './cliente/IdentificarClienteModal.jsx';
 import { PreVendasAbertasModal, VendasFinalizadasModal } from './vendas/ListasModal.jsx';
+import { EmitirModal, CancelarModal, NovaPreVendaModal } from './vendas/AcoesModais.jsx';
 
 /*
  * Ponte main.js (vanilla) → React para as telas migradas do caixa.
@@ -39,4 +40,16 @@ export function abrirPreVendasAbertasReact(ctx) {
 
 export function abrirVendasFinalizadasReact(ctx) {
   montar(<VendasFinalizadasModal ctx={ctx} onClose={fecharModalReact} />);
+}
+
+export function abrirEmitirReact(ctx) {
+  montar(<EmitirModal ctx={ctx} onClose={fecharModalReact} />);
+}
+
+export function abrirCancelarReact(ctx) {
+  montar(<CancelarModal ctx={ctx} onClose={fecharModalReact} />);
+}
+
+export function abrirNovaPreVendaReact(ctx) {
+  montar(<NovaPreVendaModal ctx={ctx} onClose={fecharModalReact} />);
 }
