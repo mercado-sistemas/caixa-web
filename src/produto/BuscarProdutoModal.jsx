@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import ScannerCamera from '../scanner/ScannerCamera.jsx';
 
 /*
  * Janela Buscar Produto (F7) do caixa — em React.
@@ -12,9 +13,10 @@ import { useEffect, useRef, useState } from 'react';
 const brl = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function BuscarProdutoModal({ ctx, onClose }) {
-  const { estoqueApi, caixaApi, toast, filialAtual, nomeFil, escanear, preVendaNum, onItemAdicionado } = ctx;
+  const { estoqueApi, caixaApi, toast, filialAtual, nomeFil, preVendaNum, onItemAdicionado } = ctx;
 
   const [busca, setBusca] = useState('');
+  const [scannerAberto, setScannerAberto] = useState(false);
   const [produtos, setProdutos] = useState([]);
   const [estado, setEstado] = useState('vazio'); // vazio | buscando | ok | erro
   const [erro, setErro] = useState('');
@@ -57,6 +59,16 @@ export default function BuscarProdutoModal({ ctx, onClose }) {
     timer.current = setTimeout(() => buscar(v), 400);
   }
 
+  // código lido pela câmera: preenche e busca na hora
+  function onScan(codigo) {
+    setScannerAberto(false);
+    const cod = String(codigo).trim();
+    setBusca(cod);
+    clearTimeout(timer.current);
+    if (cod) buscar(cod);
+    toast(`Código lido: <b>${cod}</b>`);
+  }
+
   function escolher(p) {
     setSelId(p.id);
     setUnit(p.preco);
@@ -90,6 +102,8 @@ export default function BuscarProdutoModal({ ctx, onClose }) {
   }
 
   return (
+   <>
+    {scannerAberto && <ScannerCamera onDetected={onScan} onClose={() => setScannerAberto(false)} />}
     <div className="janela" style={{ maxWidth: 700 }}>
       <div className="janela-cab">
         <div className="dobra" />
@@ -104,7 +118,7 @@ export default function BuscarProdutoModal({ ctx, onClose }) {
             onChange={onBuscaInput}
             onKeyDown={(e) => { if (e.key === 'Enter') buscar(); }} />
           <button className="btn-acao" onClick={() => buscar()}>Buscar</button>
-          <button className="btn-acao primario" type="button" title="Escanear código de barras pelo celular" onClick={() => escanear()}>📷 Escanear</button>
+          <button className="btn-acao primario" type="button" title="Escanear código de barras pela câmera" onClick={() => setScannerAberto(true)}>📷 Escanear</button>
         </div>
 
         <div className="moldura-grid" style={{ maxHeight: 300 }}>
@@ -157,5 +171,6 @@ export default function BuscarProdutoModal({ ctx, onClose }) {
         )}
       </div>
     </div>
+   </>
   );
 }
