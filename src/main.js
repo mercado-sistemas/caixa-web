@@ -1,8 +1,11 @@
 import { abrirBuscarProdutoReact, abrirIdentificarClienteReact, abrirPreVendasAbertasReact, abrirVendasFinalizadasReact, abrirEmitirReact, abrirCancelarReact, abrirNovaPreVendaReact, fecharModalReact } from './montar.jsx';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const BFF   = import.meta.env.VITE_BFF_URL;          // caixa-bff (pré-vendas)
-const EBFF  = import.meta.env.VITE_ESTOQUE_BFF_URL;  // estocaai-bff (produtos)
+// O caixa-web fala SÓ com o caixa-bff. Produtos e clientes (dados do estoque)
+// também vêm por aqui: caixa-bff → caixa-api → estocaai-api. Assim não há
+// chamada cross-origin do navegador para o estoque-BFF (nem CORS, nem uma
+// segunda URL para configurar).
+const BFF = import.meta.env.VITE_BFF_URL;   // caixa-bff
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 let _token = localStorage.getItem('cx_token') || null;
@@ -22,8 +25,7 @@ async function apiFetch(base, path, { method = 'GET', body } = {}) {
   if (!r.ok) throw new Error(data.erro || data.message || `Erro ${r.status}`);
   return data;
 }
-const caixaApi   = (p, o) => apiFetch(BFF, p, o);
-const estoqueApi = (p, o) => apiFetch(EBFF, p, o);
+const caixaApi = (p, o) => apiFetch(BFF, p, o);
 
 // ─── Estado ───────────────────────────────────────────────────────────────────
 let sessao      = null;
@@ -294,7 +296,7 @@ function janelaIdentificarCliente() {
   if (!preVenda) return toast('Sem pré-venda ativa.');
   fecharJanela();
   abrirIdentificarClienteReact({
-    estoqueApi, toast,
+    caixaApi, toast,
     onSelecionado(c) { clienteAtual = c; setInfoCliente(c); },
     onRemovido() { clienteAtual = null; setInfoCliente(null); },
   });
@@ -308,7 +310,7 @@ function abrirBuscarProduto() {
   if (!preVenda) return toast('Crie uma pré-venda primeiro (F2).');
   fecharJanela();
   abrirBuscarProdutoReact({
-    estoqueApi, caixaApi, toast, filialAtual, nomeFil,
+    caixaApi, toast, filialAtual, nomeFil,
     escanear: escanearPeloCelular,
     preVendaNum: preVenda.num,
     onItemAdicionado(pv) { preVenda = pv; atualizarUI(); },

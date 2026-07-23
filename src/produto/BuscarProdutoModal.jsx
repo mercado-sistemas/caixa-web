@@ -13,7 +13,7 @@ import ScannerCamera from '../scanner/ScannerCamera.jsx';
 const brl = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function BuscarProdutoModal({ ctx, onClose }) {
-  const { estoqueApi, caixaApi, toast, filialAtual, nomeFil, preVendaNum, onItemAdicionado } = ctx;
+  const { caixaApi, toast, filialAtual, nomeFil, preVendaNum, onItemAdicionado } = ctx;
 
   const [busca, setBusca] = useState('');
   const [scannerAberto, setScannerAberto] = useState(false);
@@ -43,7 +43,7 @@ export default function BuscarProdutoModal({ ctx, onClose }) {
     if (!termo) return;
     setEstado('buscando'); setErro('');
     try {
-      const lista = await estoqueApi(`/produtos?busca=${encodeURIComponent(termo)}`);
+      const lista = await caixaApi(`/produtos?busca=${encodeURIComponent(termo)}`);
       setProdutos(lista);
       setEstado('ok');
       if (lista.length === 1) escolher(lista[0]);

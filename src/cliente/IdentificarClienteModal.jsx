@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react';
  * ctx.onSelecionado / ctx.onRemovido.
  */
 export default function IdentificarClienteModal({ ctx, onClose }) {
-  const { estoqueApi, toast, onSelecionado, onRemovido } = ctx;
+  const { caixaApi, toast, onSelecionado, onRemovido } = ctx;
 
   const [busca, setBusca] = useState('');
   const [clientes, setClientes] = useState([]);
@@ -30,7 +30,7 @@ export default function IdentificarClienteModal({ ctx, onClose }) {
     if (!q) return toast('Digite para buscar.');
     setEstado('buscando'); setErro('');
     try {
-      const lista = await estoqueApi(`/clientes?busca=${encodeURIComponent(q)}`);
+      const lista = await caixaApi(`/clientes?busca=${encodeURIComponent(q)}`);
       setClientes(lista);
       setEstado('ok');
       if (lista.length === 1) selecionar(lista[0]);
