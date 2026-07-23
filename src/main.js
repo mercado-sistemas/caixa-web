@@ -1,3 +1,5 @@
+import { abrirBuscarProdutoReact, abrirIdentificarClienteReact, fecharModalReact } from './montar.jsx';
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 const BFF   = import.meta.env.VITE_BFF_URL;          // caixa-bff (pré-vendas)
 const EBFF  = import.meta.env.VITE_ESTOQUE_BFF_URL;  // estocaai-bff (produtos)
@@ -64,6 +66,7 @@ function abrirJanela(titulo, html, larg) {
   document.body.appendChild(j);
 }
 function fecharJanela() {
+  fecharModalReact();
   $('#janela-ativa')?.remove();
   overlay(false);
 }
@@ -269,170 +272,38 @@ async function removerItem(idx) {
   } catch (e) { toast(e.message); }
 }
 
-// ─── Identificar Cliente (0) ──────────────────────────────────────────────────
+// ─── Identificar Cliente (0) — tela em React (src/cliente/) ───────────────────
+/* Migrada pela segurança: nome/fantasia/CPF/cidade vêm do estoque (digitados
+   por pessoas) e antes iam para innerHTML. O main.js segue dono do cliente da
+   pré-venda; seleção/remoção voltam pelos callbacks. */
+function setInfoCliente(c) {
+  $('#info-cliente').textContent = c ? c.nome + (c.cpfCnpj ? ` (${c.cpfCnpj})` : '') : '—';
+}
 function janelaIdentificarCliente() {
   if (!preVenda) return toast('Sem pré-venda ativa.');
-  abrirJanela('Identificar Cliente', `
-    <div class="linha-consulta" style="margin-bottom:10px">
-      <input type="text" id="ic-busca" placeholder="Nome, CPF/CNPJ ou código do cliente…" autocomplete="off">
-      <button class="btn-acao" onclick="buscarClientesCaixa()">Buscar</button>
-    </div>
-    <div class="moldura-grid" style="max-height:300px"><table class="tabela" id="grid-ic">
-      <thead><tr><th class="num">Cód</th><th>Nome</th><th>Fantasia</th><th>CPF/CNPJ</th><th>Cidade</th></tr></thead>
-      <tbody><tr><td colspan="5" style="text-align:center;color:var(--cinza);padding:18px">Digite para buscar.</td></tr></tbody>
-    </table></div>
-    <div class="rodape-form">
-      <button class="btn-acao" onclick="fecharJanela()">Fechar</button>
-      <button class="btn-acao" onclick="limparCliente()">Remover Cliente</button>
-    </div>`, 780);
-  setTimeout(() => $('#ic-busca')?.focus(), 60);
-  $('#ic-busca').addEventListener('keydown', e => { if (e.key === 'Enter') buscarClientesCaixa(); });
-}
-
-let _icClientes = [];
-async function buscarClientesCaixa() {
-  const q = ($('#ic-busca')?.value || '').trim();
-  if (!q) return toast('Digite para buscar.');
-  const tb = document.querySelector('#grid-ic tbody');
-  if (!tb) return;
-  tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--cinza);padding:18px">Buscando…</td></tr>';
-  try {
-    _icClientes = await estoqueApi(`/clientes?busca=${encodeURIComponent(q)}`);
-    tb.innerHTML = _icClientes.map(c => `
-      <tr onclick="selecionarClienteCaixa('${c.id}')">
-        <td class="num">${c.cod || '—'}</td><td>${c.nome}</td>
-        <td>${c.fantasia || '—'}</td><td>${c.cpfCnpj || '—'}</td><td>${c.cidade || '—'}</td>
-      </tr>`).join('') ||
-      '<tr><td colspan="5" style="text-align:center;color:var(--cinza);padding:18px">Nenhum cliente.</td></tr>';
-    if (_icClientes.length === 1) selecionarClienteCaixa(_icClientes[0].id);
-  } catch (e) {
-    if (tb) tb.innerHTML = `<tr><td colspan="5" style="color:var(--vermelho);text-align:center;padding:18px">${e.message}</td></tr>`;
-  }
-}
-
-async function selecionarClienteCaixa(id) {
-  const c = _icClientes.find(x => x.id === id);
-  if (!c) return;
-  clienteAtual = c;
   fecharJanela();
-  $('#info-cliente').textContent = c.nome + (c.cpfCnpj ? ` (${c.cpfCnpj})` : '');
-  toast(`Cliente identificado: <b>${c.nome}</b>`);
+  abrirIdentificarClienteReact({
+    estoqueApi, toast,
+    onSelecionado(c) { clienteAtual = c; setInfoCliente(c); },
+    onRemovido() { clienteAtual = null; setInfoCliente(null); },
+  });
 }
 
-function limparCliente() {
-  clienteAtual = null;
-  $('#info-cliente').textContent = '—';
-  fecharJanela();
-  toast('Cliente removido da pré-venda.');
-}
-
-// ─── Buscar Produto (F7) ──────────────────────────────────────────────────────
+// ─── Buscar Produto (F7) — tela em React (src/produto/) ──────────────────────
+/* Migrada pela segurança: o nome do produto vem do estoque e antes ia para
+   innerHTML na lista. O main.js é dono da pré-venda; o item adicionado volta
+   pelo callback, que atualiza o estado e a UI. */
 function abrirBuscarProduto() {
   if (!preVenda) return toast('Crie uma pré-venda primeiro (F2).');
-  abrirJanela('Buscar Produto', `
-    <div class="linha-consulta" style="margin-bottom:10px">
-      <input type="text" id="bp-in" placeholder="Nome, código ou código de barras… (Enter para pesquisar)" autocomplete="off">
-      <button class="btn-acao" onclick="buscarProduto()">Buscar</button>
-      <button class="btn-acao primario" type="button" onclick="escanearPeloCelular()"
-              title="Escanear código de barras pelo celular">📷 Escanear</button>
-    </div>
-    <div class="moldura-grid" style="max-height:300px"><table class="tabela" id="grid-bp">
-      <thead><tr><th>Código</th><th>Descrição</th><th class="num">Saldo ${nomeFil(filialAtual)}</th><th class="num">Preço</th></tr></thead>
-      <tbody><tr><td colspan="4" style="text-align:center;color:var(--cinza);padding:18px">Digite para buscar.</td></tr></tbody>
-    </table></div>
-    <div id="form-add" class="hide">
-      <div style="border-top:1px solid var(--linha); margin-top:12px; padding-top:12px">
-        <div class="form-linha"><label>Produto</label><input id="ap-nome" disabled></div>
-        <div class="form-linha"><label>Quantidade</label><input id="ap-qtd" type="number" min="1" value="1" inputmode="numeric"></div>
-        <div class="form-linha"><label>Preço Unit. (R$)</label><input id="ap-unit" type="number" step="any" min="0.01" inputmode="decimal"></div>
-      </div>
-      <div class="rodape-form">
-        <button class="btn-acao" onclick="fecharJanela()">Fechar</button>
-        <button class="btn-acao primario" id="btn-add" onclick="adicionarItem()">Adicionar Item</button>
-      </div>
-    </div>
-    <div id="hint-bp" class="rodape-form" style="margin-top:10px">
-      <button class="btn-acao" onclick="fecharJanela()">Fechar</button>
-    </div>`, 700);
-
-  let _bpTimer = null;
-  $('#bp-in').addEventListener('input', () => {
-    clearTimeout(_bpTimer);
-    _bpTimer = setTimeout(buscarProduto, 400);
+  fecharJanela();
+  abrirBuscarProdutoReact({
+    estoqueApi, caixaApi, toast, filialAtual, nomeFil,
+    escanear: escanearPeloCelular,
+    preVendaNum: preVenda.num,
+    onItemAdicionado(pv) { preVenda = pv; atualizarUI(); },
   });
-  $('#bp-in').addEventListener('keydown', e => { if (e.key === 'Enter') buscarProduto(); });
-  setTimeout(() => $('#bp-in')?.focus(), 60);
 }
 
-async function buscarProduto() {
-  const q = ($('#bp-in')?.value || '').trim();
-  if (!q) return;
-  const tb = document.querySelector('#grid-bp tbody');
-  if (!tb) return;
-  tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--cinza);padding:18px">Buscando…</td></tr>';
-  try {
-    PRODUTOS = await estoqueApi(`/produtos?busca=${encodeURIComponent(q)}`);
-    tb.innerHTML = PRODUTOS.map(p => {
-      const saldo = (p.saldo ?? {})[filialAtual] || 0;
-      return `<tr onclick="selecionarProdutoBusca('${p.id}')">
-        <td class="num">${p.cod}</td><td>${p.nome}</td>
-        <td class="num ${saldo === 0 ? 'neg' : ''}">${saldo}</td>
-        <td class="num">${brl(p.preco)}</td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--cinza);padding:18px">Nenhum produto encontrado.</td></tr>';
-    if (PRODUTOS.length === 1) selecionarProdutoBusca(PRODUTOS[0].id);
-  } catch (e) {
-    if (tb) tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--vermelho);padding:18px">${e.message}</td></tr>`;
-  }
-}
-
-function selecionarProdutoBusca(id) {
-  const p = PRODUTOS.find(x => x.id === id);
-  if (!p) return;
-  document.querySelectorAll('#grid-bp tbody tr').forEach(r => r.classList.remove('sel'));
-  const row = [...document.querySelectorAll('#grid-bp tbody tr')].find(r => r.onclick?.toString().includes(id));
-  if (row) row.classList.add('sel');
-
-  const form = $('#form-add'); const hint = $('#hint-bp');
-  if (form) { form.classList.remove('hide'); if (hint) hint.classList.add('hide'); }
-  if ($('#ap-nome')) $('#ap-nome').value = `${p.cod} — ${p.nome}`;
-  if ($('#ap-unit')) { $('#ap-unit').value = p.preco; $('#ap-unit')._produtoId = id; }
-  if ($('#ap-qtd')) { $('#ap-qtd').value = 1; $('#ap-qtd').focus(); }
-}
-
-async function adicionarItem() {
-  if (!preVenda) return toast('Sem pré-venda ativa.');
-  const unit = $('#ap-unit');
-  const pid = unit?._produtoId;
-  const p = PRODUTOS.find(x => x.id === pid);
-  if (!p) return toast('Selecione um produto da lista.');
-
-  const qtd = parseInt($('#ap-qtd').value);
-  const unitVal = parseFloat(unit.value);
-  if (!qtd || qtd < 1) return toast('Informe uma quantidade válida.');
-  if (!unitVal || unitVal <= 0) return toast('Preço deve ser maior que zero.');
-
-  const saldo = (p.saldo ?? {})[filialAtual] || 0;
-  if (saldo < qtd) {
-    const confirma = confirm(`Saldo insuficiente em ${nomeFil(filialAtual)}: ${saldo} disponível.\nContinuar mesmo assim?`);
-    if (!confirma) return;
-  }
-
-  const btn = $('#btn-add');
-  btn.disabled = true; btn.textContent = 'Adicionando…';
-  try {
-    preVenda = await caixaApi(`/prevendas/${preVenda.num}/itens`, {
-      method: 'POST',
-      body: { produtoId: p.id, cod: p.cod, nome: p.nome, qtd, unit: unitVal },
-    });
-    atualizarUI();
-    fecharJanela();
-    toast(`<b>${qtd}× ${p.cod}</b> adicionado.`);
-  } catch (e) {
-    toast(e.message);
-    btn.disabled = false; btn.textContent = 'Adicionar Item';
-  }
-}
 
 // ─── F9 Emitir NFC-e ─────────────────────────────────────────────────────────
 function janelaEmitir() {
@@ -782,13 +653,13 @@ montarMenus(); montarToolbar();
 // ─── Global ───────────────────────────────────────────────────────────────────
 Object.assign(window, {
   entrar, selecionarFilialLogin, fecharJanela, fecharMenus,
-  abrirBuscarProduto, buscarProduto, selecionarProdutoBusca, adicionarItem,
+  abrirBuscarProduto,
   escanearPeloCelular,
   janelaEmitir, adicionarPagamento, removePagamento, confirmarEmissao,
   janelaCancelar, confirmarCancelamento,
   janelaNovaPreVenda, confirmarNovaPV,
   janelaPreVendasAbertas, carregarPreVenda,
   janelaVendasFinalizadas,
-  janelaIdentificarCliente, buscarClientesCaixa, selecionarClienteCaixa, limparCliente,
+  janelaIdentificarCliente,
   removerItem, nomeFil,
 });
